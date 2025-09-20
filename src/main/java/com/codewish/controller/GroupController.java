@@ -64,7 +64,7 @@ public class GroupController {
         }
 
         Optional<Group> groupOpt = groupService.findById(id);
-        if (groupOpt.isEmpty()) {
+        if (!groupOpt.isPresent()) {
             return "redirect:/dashboard";
         }
 
@@ -80,8 +80,57 @@ public class GroupController {
         model.addAttribute("members", members);
         model.addAttribute("expenses", expenses);
         model.addAttribute("userBalance", userBalance);
+        model.addAttribute("userService", userService);
 
         return "group-details";
+    }
+
+    @GetMapping("/{id}/settlements")
+    public String viewGroupSettlements(@PathVariable Long id, HttpSession session, Model model) {
+        User user = (User) session.getAttribute("user");
+        if (user == null) {
+            return "redirect:/login";
+        }
+
+        Optional<Group> groupOpt = groupService.findById(id);
+        if (!groupOpt.isPresent()) {
+            return "redirect:/dashboard";
+        }
+
+        Group group = groupOpt.get();
+        List<BalanceService.Settlement> settlements = balanceService.getGroupSettlements(id);
+
+        boolean isGroupAdmin = group.getCreatedBy().equals(user.getId());
+
+
+        model.addAttribute("user", user);
+        model.addAttribute("group", group);
+        model.addAttribute("settlements", settlements);
+        model.addAttribute("isGroupAdmin", isGroupAdmin);
+
+
+        return "group-settlements";
+    }
+
+    @PostMapping("/{groupId}/settle")
+    public String markAsSettled(@PathVariable Long groupId,
+                                @RequestParam Long fromUserId,
+                                @RequestParam Long toUserId,
+                                @RequestParam BigDecimal amount,
+                                HttpSession session, RedirectAttributes redirectAttributes) {
+        User user = (User) session.getAttribute("user");
+        if (user == null) {
+            return "redirect:/login";
+        }
+
+        try {
+            expenseService.createSettlementExpense(groupId, fromUserId, toUserId, amount);
+            redirectAttributes.addFlashAttribute("success", "Settlement recorded successfully!");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Failed to record settlement: " + e.getMessage());
+        }
+
+        return "redirect:/groups/" + groupId + "/settlements";
     }
 
     @PostMapping("/{id}/add-member")

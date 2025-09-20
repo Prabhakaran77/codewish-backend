@@ -56,12 +56,57 @@ public class ExpenseService {
         return savedExpense;
     }
 
+    @Transactional
+    public Expense createExpenseWithCustomSplit(Long groupId, String description, BigDecimal amount,
+                                                Long paidByUserId, LocalDate expenseDate, List<Long> participantIds) {
+        Optional<Group> groupOpt = groupRepository.findById(groupId);
+        if (!groupOpt.isPresent()) {
+            throw new RuntimeException("Group not found");
+        }
+
+        if (participantIds == null || participantIds.isEmpty()) {
+            throw new RuntimeException("At least one participant is required");
+        }
+
+        Group group = groupOpt.get();
+        Expense expense = new Expense(group, description, amount, paidByUserId, expenseDate);
+        Expense savedExpense = expenseRepository.save(expense);
+
+        // Create equal splits only for selected participants
+        BigDecimal splitAmount = amount.divide(new BigDecimal(participantIds.size()), 2, RoundingMode.HALF_UP);
+
+        for (Long participantId : participantIds) {
+            ExpenseSplit split = new ExpenseSplit(savedExpense, participantId, splitAmount);
+            expenseSplitRepository.save(split);
+        }
+
+        return savedExpense;
+    }
     public List<Expense> getGroupExpenses(Long groupId) {
         return expenseRepository.findByGroupIdOrderByDateDesc(groupId);
     }
 
     public Optional<Expense> findById(Long id) {
         return expenseRepository.findById(id);
+    }
+
+    @Transactional
+    public void createSettlementExpense(Long groupId, Long fromUserId, Long toUserId, BigDecimal amount) {
+        Optional<Group> groupOpt = groupRepository.findById(groupId);
+        if (!groupOpt.isPresent()) {
+            throw new RuntimeException("Group not found");
+        }
+
+        Group group = groupOpt.get();
+
+        // Create settlement expense - person who owes money "pays" the settlement
+        Expense settlementExpense = new Expense(group, "Settlement", amount, fromUserId, java.time.LocalDate.now());
+        Expense savedExpense = expenseRepository.save(settlementExpense);
+
+        // Create split where only the person who should receive money "owes" the settlement
+        // This effectively transfers the debt
+        ExpenseSplit split = new ExpenseSplit(savedExpense, toUserId, amount);
+        expenseSplitRepository.save(split);
     }
 
     public List<ExpenseSplit> getExpenseSplits(Long expenseId) {

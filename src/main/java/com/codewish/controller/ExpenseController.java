@@ -1,5 +1,6 @@
 package com.codewish.controller;
 
+import com.codewish.model.GroupMember;
 import com.codewish.model.User;
 import com.codewish.model.Group;
 import com.codewish.model.Expense;
@@ -14,6 +15,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import jakarta.servlet.http.HttpSession;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 @Controller
@@ -25,9 +27,6 @@ public class ExpenseController {
 
     @Autowired
     private GroupService groupService;
-
-    @Autowired
-    private UserService userService;
 
     @GetMapping("/create")
     public String createExpensePage(@RequestParam Long groupId, HttpSession session, Model model) {
@@ -41,14 +40,19 @@ public class ExpenseController {
             return "redirect:/dashboard";
         }
 
+        List<GroupMember> members = groupService.getGroupMembers(groupId);
+
         model.addAttribute("user", user);
         model.addAttribute("group", groupOpt.get());
+        model.addAttribute("members", members);
         return "create-expense";
     }
 
     @PostMapping("/create")
     public String createExpense(@RequestParam Long groupId, @RequestParam String description,
                                 @RequestParam BigDecimal amount, @RequestParam String expenseDate,
+                                @RequestParam Long paidByUserId,
+                                @RequestParam(required = false) List<Long> participantIds,
                                 HttpSession session, RedirectAttributes redirectAttributes) {
         User user = (User) session.getAttribute("user");
         if (user == null) {
@@ -56,7 +60,13 @@ public class ExpenseController {
         }
 
         LocalDate date = LocalDate.parse(expenseDate);
-        Expense expense = expenseService.createExpenseWithEqualSplit(groupId, description, amount, user.getId(), date);
+
+        Expense expense;
+        if (participantIds != null && !participantIds.isEmpty()) {
+            expense = expenseService.createExpenseWithCustomSplit(groupId, description, amount, paidByUserId, date, participantIds);
+        } else {
+            expense = expenseService.createExpenseWithEqualSplit(groupId, description, amount, paidByUserId, date);
+        }
 
         redirectAttributes.addFlashAttribute("success", "Expense added successfully!");
         return "redirect:/groups/" + groupId;
@@ -75,10 +85,8 @@ public class ExpenseController {
         }
 
         Expense expense = expenseOpt.get();
-        String name = userService.findById(expense.getPaidByUserId()).get().getUsername();
         model.addAttribute("user", user);
         model.addAttribute("expense", expense);
-        model.addAttribute("name", name);
         model.addAttribute("splits", expenseService.getExpenseSplits(id));
 
         return "expense-details";
