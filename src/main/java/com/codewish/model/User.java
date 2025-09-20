@@ -1,29 +1,40 @@
 package com.codewish.model;
 
-
 import jakarta.persistence.*;
-import lombok.*;
-
-import java.util.List;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.time.LocalDateTime;
+import java.util.Set;
 
 @Entity
-@Table(name = "user_entity")
+@Table(name = "users")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class User {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String name;
+    @Column(unique = true, nullable = false, length = 50)
+    private String username;
 
-    @Column(unique = true)
-    private String accessCode;
+    @Column(unique = true, nullable = false, length = 100)
+    private String email;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
-    private List<Note> notes;
+    @Column(nullable = false)
+    private String password;
 
+    @Column(name = "created_date")
+    private LocalDateTime createdDate = LocalDateTime.now();
 
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    private Set<GroupMember> groupMembers;
+
+    public User(String username, String email, String password) {
+        this.username = username;
+        this.email = email;
+        this.password = password;
+    }
 }
