@@ -61,6 +61,6 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/codewish-backend:latest
-            ghcr.io/${{ github.repository_owner }}/codewish-backend:${{ github.sha }}
+            ghcr.io/prabhakaran77/codewish-backend:latest
+            ghcr.io/prabhakaran77/codewish-backend:${{ github.sha }}
 
